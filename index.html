@@ -1,0 +1,359 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniPhone Studio</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#e9eaff;color:#20213a;
+ font-family:Arial,sans-serif;padding:20px;
+ display:flex;justify-content:center;align-items:center;
+ min-height:100vh
+}
+.layout{display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center}
+.phone{
+ width:330px;height:660px;background:#161625;
+ border:8px solid #252536;border-radius:42px;
+ padding:10px;box-shadow:0 20px 55px #45456a55;
+ position:relative
+}
+.screen{
+ height:100%;border-radius:29px;overflow:hidden;
+ background:linear-gradient(145deg,#c4b5fd,#fbcfe8);
+ position:relative
+}
+.status{display:flex;justify-content:space-between;padding:15px 17px;font-size:12px}
+.content{padding:12px 15px;height:calc(100% - 50px);overflow:auto}
+.clock{font-size:43px;font-weight:bold;margin-top:12px}
+.date{font-size:13px;margin:5px 0 25px}
+.apps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px 8px}
+.app{
+ border:0;background:#ffffff35;border-radius:16px;
+ padding:10px 3px;color:#20213a;cursor:pointer;
+ overflow-wrap:anywhere
+}
+.app .emoji{font-size:29px;display:block;margin-bottom:6px}
+.app small{font-size:11px}
+.dock{display:flex;justify-content:space-around;margin-top:22px}
+.dock button,.nav button{
+ border:0;border-radius:15px;padding:10px;cursor:pointer;
+ background:#ffffff60;font-size:20px
+}
+.nav{position:absolute;bottom:9px;left:0;right:0;text-align:center}
+.nav button{padding:4px 38px;font-size:12px}
+.panel{
+ width:300px;background:white;padding:20px;border-radius:25px;
+ box-shadow:0 10px 35px #45456a20
+}
+h2{font-size:20px;margin-top:0}
+label{display:block;font-size:13px;margin-top:13px}
+input,select,textarea{
+ width:100%;padding:10px;margin-top:6px;
+ border:1px solid #d7d7e8;border-radius:10px;font:inherit
+}
+textarea{resize:vertical}
+.action{
+ background:#6554d9;color:white;border:0;border-radius:11px;
+ padding:11px 13px;cursor:pointer;margin-top:12px;width:100%
+}
+.secondary{background:#eeeaff;color:#4435a5}
+.appview{padding:8px}
+.back{border:0;border-radius:10px;padding:9px;cursor:pointer}
+.wallpaper{
+ background-size:cover!important;background-position:center!important
+}
+.note{font-size:12px;color:#666;margin-top:15px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<div class="phone">
+ <div class="screen wallpaper" id="screen">
+  <div class="status">
+   <span id="deviceName">My Phone</span>
+   <span>●  Wi-Fi ▰</span>
+  </div>
+  <div class="content" id="content"></div>
+  <div class="nav">
+   <button onclick="home()">━━━</button>
+  </div>
+ </div>
+</div>
+
+<div class="panel">
+ <h2>⚙️ MiniPhone Studio</h2>
+
+ <label>Nama ponsel</label>
+ <input id="nameInput" value="My Phone">
+
+ <label>Warna wallpaper</label>
+ <input type="color" id="colorInput" value="#c4b5fd">
+
+ <label>Wallpaper gambar sendiri</label>
+ <input type="file" id="wallInput" accept="image/*">
+
+ <button class="action" onclick="saveSettings()">
+ Simpan tampilan
+ </button>
+
+ <hr style="border:0;border-top:1px solid #eee;margin-top:20px">
+
+ <h2>📲 Buat aplikasi</h2>
+
+ <label>Nama aplikasi</label>
+ <input id="appName" placeholder="Contoh: Diary">
+
+ <label>Ikon (emoji)</label>
+ <input id="appIcon" value="📝" maxlength="8">
+
+ <label>Isi aplikasi</label>
+ <textarea id="appText" rows="3"
+ placeholder="Tuliskan isi aplikasi buatanmu..."></textarea>
+
+ <button class="action" onclick="addApp()">
+ + Tambahkan aplikasi
+ </button>
+
+ <label>Edit aplikasi yang ada</label>
+ <select id="appSelect" onchange="selectApp()"></select>
+
+ <button class="action secondary" onclick="editApp()">
+ Simpan perubahan aplikasi
+ </button>
+
+ <button class="action secondary" onclick="deleteApp()">
+ Hapus aplikasi pilihan
+ </button>
+
+ <button class="action secondary" onclick="resetPhone()">
+ Reset ke tampilan awal
+ </button>
+
+ <p class="note">
+ Data disimpan di browser perangkat ini. Aplikasi seperti
+ kamera, telepon, dan pesan di sini merupakan simulasi,
+ bukan fungsi asli ponsel.
+ </p>
+</div>
+</div>
+
+<script>
+const defaults = [
+ {id:1,name:"Telepon",icon:"📞",text:"Simulasi aplikasi telepon."},
+ {id:2,name:"Pesan",icon:"💬",text:"Selamat datang di aplikasi pesan!"},
+ {id:3,name:"Kamera",icon:"📷",text:"Ini adalah simulasi kamera."},
+ {id:4,name:"Galeri",icon:"🖼️",text:"Galeri foto milikmu."},
+ {id:5,name:"Catatan",icon:"📝",text:"Tuliskan ide-ide kamu di sini."},
+ {id:6,name:"Musik",icon:"🎵",text:"Selamat datang di pemutar musik."},
+ {id:7,name:"Browser",icon:"🌐",text:"Ini adalah browser simulasi."},
+ {id:8,name:"Pengaturan",icon:"⚙️",text:"Atur dan kustomisasi ponselmu."}
+];
+
+let apps, settings, activeId=null;
+
+function load(){
+ try{
+  apps=JSON.parse(localStorage.getItem("miniApps"))||structuredClone(defaults);
+  settings=JSON.parse(localStorage.getItem("miniSettings"))||
+   {name:"My Phone",color:"#c4b5fd",wallpaper:""};
+ }catch(e){
+  apps=structuredClone(defaults);
+  settings={name:"My Phone",color:"#c4b5fd",wallpaper:""};
+ }
+}
+
+function persist(){
+ localStorage.setItem("miniApps",JSON.stringify(apps));
+ localStorage.setItem("miniSettings",JSON.stringify(settings));
+}
+
+function render(){
+ document.getElementById("deviceName").textContent=settings.name;
+ document.getElementById("nameInput").value=settings.name;
+ document.getElementById("colorInput").value=settings.color;
+
+ const screen=document.getElementById("screen");
+ screen.style.background=settings.color;
+ if(settings.wallpaper){
+  screen.style.backgroundImage=`url("${settings.wallpaper}")`;
+ }
+
+ const content=document.getElementById("content");
+ content.innerHTML=`
+  <div class="clock" id="clock"></div>
+  <div class="date" id="date"></div>
+  <div class="apps" id="apps"></div>
+  <div class="dock">
+   <button onclick="openApp(1)">📞</button>
+   <button onclick="openApp(2)">💬</button>
+   <button onclick="openApp(4)">🖼️</button>
+   <button onclick="openApp(8)">⚙️</button>
+  </div>`;
+
+ apps.forEach(app=>{
+  const b=document.createElement("button");
+  b.className="app";
+  b.innerHTML=`<span class="emoji"></span><small></small>`;
+  b.querySelector(".emoji").textContent=app.icon;
+  b.querySelector("small").textContent=app.name;
+  b.onclick=()=>openApp(app.id);
+  document.getElementById("apps").appendChild(b);
+ });
+ refreshTime();
+ updateSelect();
+}
+
+function refreshTime(){
+ const c=document.getElementById("clock");
+ if(!c)return;
+ const now=new Date();
+ c.textContent=now.toLocaleTimeString("id-ID",
+  {hour:"2-digit",minute:"2-digit"});
+ document.getElementById("date").textContent=
+  now.toLocaleDateString("id-ID",
+  {weekday:"long",day:"numeric",month:"long"});
+}
+
+function home(){
+ activeId=null;
+ render();
+}
+
+function openApp(id){
+ const app=apps.find(a=>a.id===id);
+ if(!app)return;
+ activeId=id;
+
+ const content=document.getElementById("content");
+ content.innerHTML="";
+
+ const back=document.createElement("button");
+ back.className="back";
+ back.textContent="← Kembali";
+ back.onclick=home;
+ content.appendChild(back);
+
+ const title=document.createElement("h2");
+ title.style.marginTop="28px";
+ title.textContent=app.icon+" "+app.name;
+ content.appendChild(title);
+
+ const body=document.createElement("div");
+ body.className="appview";
+ body.style.whiteSpace="pre-wrap";
+ body.textContent=app.text;
+ content.appendChild(body);
+
+ if(app.name.toLowerCase()==="catatan"){
+  const area=document.createElement("textarea");
+  area.rows=7;
+  area.style.marginTop="18px";
+  area.value=app.text;
+  area.placeholder="Tulis catatanmu...";
+  area.oninput=()=>{
+   app.text=area.value;
+   persist();
+  };
+  content.appendChild(area);
+ }
+}
+
+function saveSettings(){
+ settings.name=document.getElementById("nameInput").value||"My Phone";
+ settings.color=document.getElementById("colorInput").value;
+ persist();
+ render();
+}
+
+document.getElementById("wallInput").addEventListener("change",e=>{
+ const file=e.target.files[0];
+ if(!file)return;
+ if(file.size>1500000){
+  alert("Pilih gambar maksimal 1,5 MB agar penyimpanan tidak penuh.");
+  e.target.value="";
+  return;
+ }
+ const reader=new FileReader();
+ reader.onload=()=>{
+  settings.wallpaper=reader.result;
+  persist();
+  render();
+ };
+ reader.readAsDataURL(file);
+});
+
+function addApp(){
+ const name=document.getElementById("appName").value.trim();
+ const icon=document.getElementById("appIcon").value.trim()||"📱";
+ const textValue=document.getElementById("appText").value;
+ if(!name){alert("Masukkan nama aplikasi!");return;}
+
+ apps.push({id:Date.now(),name,icon,text:textValue});
+ persist();
+ document.getElementById("appName").value="";
+ document.getElementById("appText").value="";
+ render();
+}
+
+function updateSelect(){
+ const sel=document.getElementById("appSelect");
+ const old=sel.value;
+ sel.innerHTML="";
+ apps.forEach(a=>{
+  const o=document.createElement("option");
+  o.value=a.id;
+  o.textContent=a.icon+" "+a.name;
+  sel.appendChild(o);
+ });
+ if(apps.some(a=>String(a.id)===old))sel.value=old;
+}
+
+function selectApp(){
+ const a=apps.find(x=>x.id===Number(document.getElementById("appSelect").value));
+ if(!a)return;
+ document.getElementById("appName").value=a.name;
+ document.getElementById("appIcon").value=a.icon;
+ document.getElementById("appText").value=a.text;
+}
+
+function editApp(){
+ const id=Number(document.getElementById("appSelect").value);
+ const a=apps.find(x=>x.id===id);
+ if(!a)return;
+ const name=document.getElementById("appName").value.trim();
+ if(!name){alert("Nama aplikasi tidak boleh kosong.");return;}
+ a.name=name;
+ a.icon=document.getElementById("appIcon").value.trim()||"📱";
+ a.text=document.getElementById("appText").value;
+ persist();
+ render();
+}
+
+function deleteApp(){
+ const id=Number(document.getElementById("appSelect").value);
+ const a=apps.find(x=>x.id===id);
+ if(!a)return;
+ if(!confirm("Hapus aplikasi "+a.name+"?"))return;
+ apps=apps.filter(x=>x.id!==id);
+ persist();
+ render();
+}
+
+function resetPhone(){
+ if(!confirm("Kembalikan semua pengaturan ke awal?"))return;
+ apps=structuredClone(defaults);
+ settings={name:"My Phone",color:"#c4b5fd",wallpaper:""};
+ persist();
+ render();
+}
+
+load();
+render();
+setInterval(refreshTime,1000);
+</script>
+</body>
+</html>
